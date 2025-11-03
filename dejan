@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tetris Touch — Publish-ready</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#7c3aed;
+    --muted:#94a3b8;
+    --glass: rgba(255,255,255,0.04);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{
+    height:100%;
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: radial-gradient(1000px 400px at 10% 20%, rgba(124,58,237,0.12), transparent),
+                linear-gradient(180deg,#061021 0%, #071424 40%, #071424 100%);
+    color:#e6eef8;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .wrap{
+    max-width:980px;
+    margin:28px auto;
+    padding:20px;
+    display:grid;
+    grid-template-columns: 320px 1fr 240px;
+    gap:18px;
+    align-items:start;
+  }
+
+  header{
+    grid-column:1/-1;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:6px;
+  }
+  header h1{margin:0;font-size:20px;letter-spacing:0.2px}
+  header .muted{color:var(--muted);font-size:13px}
+
+  /* Game card */
+  .card{
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border-radius:var(--radius);
+    padding:14px;
+    box-shadow: 0 6px 20px rgba(2,6,23,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+  }
+
+  /* Left column: canvas + controls */
+  .play-area{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+  }
+
+  #board{
+    background: linear-gradient(180deg,#061121, #09152a);
+    border-radius:12px;
+    padding:18px;
+    box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+  }
+
+  canvas#tetris{
+    display:block;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:8px;
+    border: 2px solid rgba(255,255,255,0.03);
+    touch-action: none;
+  }
+
+  /* Right: score / next */
+  .sidebar{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .stats{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    align-items:stretch;
+  }
+  .panel{
+    background: var(--card);
+    padding:12px;
+    border-radius:12px;
+    min-height:56px;
+  }
+  .panel h3{
+    margin:0 0 8px 0;
+    font-size:13px;color:var(--muted)
+  }
+  .value{
+    font-size:20px;font-weight:700;color:#fff;
+  }
+
+  .next-preview{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    align-items:center;
+  }
+  canvas#next{
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.03);
+    touch-action:none;
+  }
+
+  /* Controls area bottom (touch buttons fallback) */
+  .controls-row{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-top:6px;
+    user-select:none;
+  }
+  .btn{
+    min-width:64px;
+    padding:10px 12px;
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.016), rgba(255,255,255,0.006));
+    border:1px solid rgba(255,255,255,0.03);
+    box-shadow: 0 6px 20px rgba(2,6,23,0.35);
+    color:#eaf2ff;
+    font-weight:600;
+    font-size:15px;
+    touch-action: manipulation;
+  }
+  .btn:active{transform:translateY(2px)}
+  .btn.accent{
+    background: linear-gradient(90deg, rgba(124,58,237,0.18), rgba(59,130,246,0.07));
+    border: 1px solid rgba(124,58,237,0.22);
+  }
+
+  .small{
+    font-size:13px;padding:8px 10px;border-radius:10px;
+  }
+
+  /* instructions */
+  .instructions{
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.4;
+  }
+
+  /* footer */
+  footer{
+    grid-column:1/-1;
+    margin-top:10px;
+    color:var(--muted);
+    font-size:13px;
+    text-align:center;
+  }
+
+  /* responsive */
+  @media (max-width:880px){
+    .wrap{grid-template-columns:1fr; padding:14px;}
+    #board{order:1}
+    .sidebar{order:2;flex-direction:row;gap:10px;overflow:auto}
+    .sidebar .panel{min-width:140px}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Tetris Touch</h1>
+        <div class="muted">Gestur: tap = putar • swipe = geser/ turun • tekan lama = hard drop</div>
+      </div>
+      <div>
+        <button id="startBtn" class="btn accent small">Start / Restart</button>
+        <button id="pauseBtn" class="btn small">Pause</button>
+      </div>
+    </header>
+
+    <section class="card play-area">
+      <div id="board" class="card" aria-label="Tetris game board">
+        <canvas id="tetris" width="240" height="400" aria-hidden="false"></canvas>
+      </div>
+
+      <div class="controls-row" aria-hidden="false">
+        <button id="leftBtn" class="btn">◀</button>
+        <button id="rotateBtn" class="btn accent">⟳</button>
+        <button id="rightBtn" class="btn">▶</button>
+        <button id="downBtn" class="btn">⬇</button>
+      </div>
+      <div style="width:100%;text-align:center;margin-top:6px" class="instructions">
+        Gunakan gestur sentuh atau tombol di atas. Untuk desktop gunakan keyboard: ← → ↓ (move), ↑ or X (rotate), space (hard drop).
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="panel stats">
+        <h3>Score</h3>
+        <div class="value" id="score">0</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1">
+            <h3>Lines</h3>
+            <div class="value" id="lines">0</div>
+          </div>
+          <div style="flex:1">
+            <h3>Level</h3>
+            <div class="value" id="level">1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel next-preview" aria-live="polite">
+        <h3 style="width:100%;">Next</h3>
+        <canvas id="next" width="120" height="120"></canvas>
+      </div>
+
+      <div class="panel">
+        <h3>Settings</h3>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="soundToggle" class="btn small">Sound: On</button>
+          <button id="shareBtn" class="btn small">Share</button>
+        </div>
+        <div style="margin-top:10px;color:var(--muted);font-size:13px">
+          Publish-ready: simpan file ini sebagai <b>index.html</b> dan push ke GitHub untuk Pages.
+        </div>
+      </div>
+    </aside>
+
+    <footer>
+      Created by ChatGPT — siap dipublish ke GitHub Pages. Instruksi singkat ada di bawah.
+    </footer>
+  </div>
+
+<script>
+/* ---------- TETRIS CORE ---------- */
+/* Grid and draw logic */
+const canvas = document.getElementById('tetris');
+const context = canvas.getContext('2d');
+const nextCanvas = document.getElementById('next');
+const nextCtx = nextCanvas.getContext('2d');
+
+const COLS = 12;
+const ROWS = 20;
+const BLOCK = Math.floor(canvas.width / COLS);
+canvas.width = COLS * BLOCK;
+canvas.height = ROWS * BLOCK;
+context.scale(BLOCK, BLOCK);
+
+nextCanvas.width = 120;
+nextCanvas.height = 120;
+const NEXT_SIZE = Math.floor(nextCanvas.width / 4);
+
+nextCtx.scale(NEXT_SIZE, NEXT_SIZE);
+
+const colors = [
+  '#000000', '#FF4D6D', '#00E676', '#2979FF', '#FFC107', '#26C6DA', '#AB47BC', '#FFFFFF'
+];
+
+function createMatrix(w, h) {
+  const m = [];
+  while (h--) m.push(new Array(w).fill(0));
+  return m;
+}
+
+function createPiece(type){
+  switch(type){
+    case 'T': return [[0,0,0],[1,1,1],[0,1,0]];
+    case 'O': return [[2,2],[2,2]];
+    case 'L': return [[0,3,0],[0,3,0],[0,3,3]];
+    case 'J': return [[0,4,0],[0,4,0],[4,4,0]];
+    case 'I': return [[0,5,0,0],[0,5,0,0],[0,5,0,0],[0,5,0,0]];
+    case 'S': return [[0,6,6],[6,6,0],[0,0,0]];
+    case 'Z': return [[7,7,0],[0,7,7],[0,0,0]];
+  }
+}
+
+/* Utility: rotate matrix (clockwise if dir>0) */
+function rotate(matrix, dir) {
+  for (let y = 0; y < matrix.length; ++y){
+    for (let x = 0; x < y; ++x){
+      [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+    }
+  }
+  if (dir > 0) matrix.forEach(row => row.reverse());
+  else matrix.reverse();
+}
+
+/* Player & Arena */
+const arena = createMatrix(COLS, ROWS);
+const player = {
+  pos: {x:0,y:0},
+  matrix:null,
+  score:0
+};
+
+function collide(arena, player){
+  const m = player.matrix, o = player.pos;
+  for (let y = 0; y < m.length; ++y){
+    for (let x = 0; x < m[y].length; ++x){
+      if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function merge(arena, player){
+  player.matrix.forEach((row,y)=>{
+    row.forEach((v,x)=>{
+      if (v !== 0) arena[y + player.pos.y][x + player.pos.x] = v;
+    });
+  });
+}
+
+function arenaSweep(){
+  let rowCount = 0;
+  outer: for (let y = arena.length - 1; y >= 0; --y){
+    for (let x = 0; x < arena[y].length; ++x){
+      if (arena[y][x] === 0) continue outer;
+    }
+    const row = arena.splice(y,1)[0].fill(0);
+    arena.unshift(row);
+    ++y;
+    rowCount++;
+  }
+  if (rowCount > 0){
+    lines += rowCount;
+    score += (rowCount === 1 ? 40 : rowCount === 2 ? 100 : rowCount === 3 ? 300 : 1200) * level;
+    updateScoreDisplay();
+    if (lines >= level * 10) {
+      level++;
+      dropInterval = Math.max(120, dropInterval - 80);
+      updateScoreDisplay();
+    }
+  }
+}
+
+function drawMatrix(matrix, offset, ctx=context){
+  matrix.forEach((row,y)=>{
+    row.forEach((v,x)=>{
+      if (v !== 0){
+        ctx.fillStyle = colors[v];
+        ctx.fillRect(x + offset.x, y + offset.y, 1, 1);
+        // subtle inner shine
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillRect(x + offset.x + 0.08, y + offset.y + 0.08, 0.84, 0.36);
+      }
+    });
+  });
+}
+
+function draw(){
+  context.clearRect(0,0,canvas.width,canvas.height);
+  // background grid
+  context.fillStyle = '#071427';
+  context.fillRect(0,0,COLS,ROWS);
+
+  drawMatrix(arena, {x:0,y:0});
+  drawMatrix(player.matrix, player.pos);
+  // draw subtle grid lines
+  context.strokeStyle = 'rgba(255,255,255,0.02)';
+  context.lineWidth = 0.02;
+  for (let x = 0; x < COLS; x++){
+    context.beginPath(); context.moveTo(x,0); context.lineTo(x,ROWS); context.stroke();
+  }
+  for (let y = 0; y < ROWS; y++){
+    context.beginPath(); context.moveTo(0,y); context.lineTo(COLS,y); context.stroke();
+  }
+  drawNext();
+}
+
+function drawNext(){
+  nextCtx.clearRect(0,0,nextCanvas.width,nextCanvas.height);
+  nextCtx.fillStyle = '#071427';
+  nextCtx.fillRect(0,0,4,4);
+  if (nextPiece) drawMatrix(nextPiece, {x:0.5,y:0.5}, nextCtx);
+}
+
+/* Player actions */
+function playerReset(){
+  const pieces = 'ILJOTSZ';
+  player.matrix = createPiece(pieces[Math.floor(Math.random()*pieces.length)]);
+  player.pos.y = 0;
+  player.pos.x = (COLS/2 | 0) - (player.matrix[0].length / 2 | 0);
+  if (collide(arena, player)){
+    // game over - clear
+    for (let y = 0; y < arena.length; ++y) arena[y].fill(0);
+    score = 0; lines = 0; level = 1;
+    dropInterval = 850;
+    updateScoreDisplay();
+  }
+}
+
+function playerDrop(){
+  player.pos.y++;
+  if (collide(arena, player)){
+    player.pos.y--;
+    merge(arena, player);
+    arenaSweep();
+    player.matrix = nextPiece || createRandomPiece();
+    nextPiece = createRandomPiece();
+    if (collide(arena, player)){
+      // top reached -> clear arena
+      for (let y = 0; y < arena.length; ++y) arena[y].fill(0);
+      score = 0; lines = 0; level = 1;
+      dropInterval = 850;
+      updateScoreDisplay();
+    }
+  }
+  dropCounter = 0;
+}
+
+function playerMove(dir){
+  player.pos.x += dir;
+  if (collide(arena, player)) player.pos.x -= dir;
+}
+
+function playerRotate(dir){
+  const pos = player.pos.x;
+  let offset = 1;
+  rotate(player.matrix, dir);
+  while (collide(arena, player)){
+    player.pos.x += offset;
+    offset = -(offset + (offset > 0 ? 1 : -1));
+    if (offset > player.matrix[0].length){
+      rotate(player.matrix, -dir);
+      player.pos.x = pos;
+      return;
+    }
+  }
+}
+
+/* Random piece generator */
+function createRandomPiece(){
+  const pieces = 'ILJOTSZ';
+  return createPiece(pieces[Math.floor(Math.random() * pieces.length)]);
+}
+
+/* Score display */
+let score = 0;
+let lines = 0;
+let level = 1;
+const scoreEl = document.getElementById('score');
+const linesEl = document.getElementById('lines');
+const levelEl = document.getElementById('level');
+
+function updateScoreDisplay(){
+  scoreEl.textContent = score;
+  linesEl.textContent = lines;
+  levelEl.textContent = level;
+}
+
+/* Game loop */
+let dropCounter = 0;
+let dropInterval = 850;
+let lastTime = 0;
+let running = false;
+let nextPiece = createRandomPiece();
+
+function update(time = 0){
+  if (!running) return;
+  const delta = time - lastTime;
+  lastTime = time;
+  dropCounter += delta;
+  if (dropCounter > dropInterval){
+    playerDrop();
+  }
+  draw();
+  requestAnimationFrame(update);
+}
+
+/* ---------- Controls: keyboard & UI ---------- */
+document.getElementById('leftBtn').addEventListener('click', ()=>{playerMove(-1); playClick(); draw();});
+document.getElementById('rightBtn').addEventListener('click', ()=>{playerMove(1); playClick(); draw();});
+document.getElementById('downBtn').addEventListener('click', ()=>{playerDrop(); playClick(); draw();});
+document.getElementById('rotateBtn').addEventListener('click', ()=>{playerRotate(1); playClick(); draw();});
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  startGame();
+});
+document.getElementById('pauseBtn').addEventListener('click', (e)=>{
+  running = !running;
+  e.target.textContent = running ? 'Pause' : 'Resume';
+  if (running) { lastTime = performance.now(); requestAnimationFrame(update); }
+});
+
+document.addEventListener('keydown', (e)=>{
+  if (!running) return;
+  if (e.key === 'ArrowLeft') { playerMove(-1); playClick(); draw(); }
+  if (e.key === 'ArrowRight') { playerMove(1); playClick(); draw(); }
+  if (e.key === 'ArrowDown') { playerDrop(); playClick(); draw(); }
+  if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'x') { playerRotate(1); playClick(); draw(); }
+  if (e.code === 'Space') { hardDrop(); playClick(true); draw(); e.preventDefault(); }
+});
+
+/* ---------- Touch gestures ---------- */
+/* We implement:
+   - tap => rotate
+   - swipe left/right => move left/right
+   - swipe down => soft drop
+   - long press (~400ms) => hard drop
+*/
+
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+let touchMoved = false;
+let longPressTimeout = null;
+const SWIPE_MIN = 18; // pixels
+const LONG_PRESS_MS = 420;
+
+function onTouchStart(e){
+  if (!running) return;
+  const t = e.touches ? e.touches[0] : e;
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchStartTime = Date.now();
+  touchMoved = false;
+
+  // start long press detection for hard drop
+  longPressTimeout = setTimeout(()=>{
+    // hard drop
+    hardDrop();
+    playClick(true);
+    draw();
+  }, LONG_PRESS_MS);
+}
+
+function onTouchMove(e){
+  if (!running) return;
+  const t = e.touches ? e.touches[0] : e;
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) touchMoved = true;
+  // If swiping downward, make it fall faster while moving finger
+  if (Math.abs(dy) > Math.abs(dx) && dy > SWIPE_MIN){
+    // soft drop continuously while finger down
+    playerDrop();
+    playClick();
+    draw();
+    touchStartY = t.clientY; // reset to allow repeated small steps
+  }
+}
+
+function onTouchEnd(e){
+  if (!running) return;
+  clearTimeout(longPressTimeout);
+  const timeDelta = Date.now() - touchStartTime;
+  if (!touchMoved && timeDelta < LONG_PRESS_MS){
+    // treat as tap => rotate
+    playerRotate(1);
+    playClick();
+    draw();
+    return;
+  }
+  // If touch moved, evaluate swipe direction
+  // Use changedTouches if available
+  const t = (e.changedTouches && e.changedTouches[0]) || e;
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_MIN){
+    if (dx < 0) playerMove(-1);
+    else playerMove(1);
+    playClick();
+    draw();
+  } else if (Math.abs(dy) > Math.abs(dx) && dy > SWIPE_MIN){
+    // swipe down => one soft drop (already may be dropped during move)
+    playerDrop();
+    playClick();
+    draw();
+  }
+}
+
+/* Attach touch listeners to the main canvas */
+canvas.addEventListener('touchstart', (e)=>{ e.preventDefault(); onTouchStart(e); }, {passive:false});
+canvas.addEventListener('touchmove', (e)=>{ e.preventDefault(); onTouchMove(e); }, {passive:false});
+canvas.addEventListener('touchend', (e)=>{ e.preventDefault(); onTouchEnd(e); }, {passive:false});
+/* Also support mouse for desktop testing */
+canvas.addEventListener('mousedown', (e)=>{ onTouchStart(e); });
+canvas.addEventListener('mousemove', (e)=>{ if (e.buttons) onTouchMove(e); });
+canvas.addEventListener('mouseup', (e)=>{ onTouchEnd(e); });
+
+/* ---------- Audio (simple) ---------- */
+let audioEnabled = true;
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ensureAudio(){
+  if (!audioEnabled) return;
+  if (!audioCtx) audioCtx = new AudioCtx();
+}
+function playClick(hard=false){
+  if (!audioEnabled) return;
+  ensureAudio();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type = hard ? 'sawtooth' : 'square';
+  o.frequency.value = hard ? 420 : 880;
+  g.gain.value = 0.02;
+  o.start();
+  setTimeout(()=>{ o.stop(); }, hard ? 120 : 60);
+}
+document.getElementById('soundToggle').addEventListener('click', (e)=>{
+  audioEnabled = !audioEnabled;
+  e.target.textContent = 'Sound: ' + (audioEnabled ? 'On' : 'Off');
+});
+
+/* ---------- Hard drop ---------- */
+function hardDrop(){
+  while (!collide(arena, player)){
+    player.pos.y++;
+  }
+  player.pos.y--;
+  merge(arena, player);
+  arenaSweep();
+  player.matrix = nextPiece || createRandomPiece();
+  nextPiece = createRandomPiece();
+  updateScoreDisplay();
+}
+
+/* ---------- Game lifecycle ---------- */
+function startGame(){
+  // Reset everything
+  for (let y=0;y<arena.length;y++) arena[y].fill(0);
+  score = 0; lines = 0; level = 1;
+  dropInterval = 850;
+  nextPiece = createRandomPiece();
+  player.matrix = createRandomPiece();
+  player.pos.x = (COLS/2 | 0) - (player.matrix[0].length / 2 | 0);
+  player.pos.y = 0;
+  updateScoreDisplay();
+  running = true;
+  lastTime = performance.now();
+  document.getElementById('pauseBtn').textContent = 'Pause';
+  requestAnimationFrame(update);
+}
+
+/* ---------- Share button (simple) ---------- */
+document.getElementById('shareBtn').addEventListener('click', async ()=>{
+  const url = location.href;
+  if (navigator.share){
+    try { await navigator.share({title:'Tetris Touch', text:'Main Tetris sederhana (Touch)', url}); }
+    catch(e){}
+  } else {
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Link disalin ke clipboard');
+    } catch(e){ alert('Salin link: ' + url); }
+  }
+});
+
+/* ---------- Init ---------- */
+player.matrix = createRandomPiece();
+player.pos.x = (COLS/2 | 0) - (player.matrix[0].length / 2 | 0);
+nextPiece = createRandomPiece();
+draw();
+updateScoreDisplay();
+
+/* Auto start on first touch/click to allow audio resume on mobile */
+function resumeOnFirstInteraction(){
+  if (audioCtx) return;
+  try { ensureAudio(); } catch(e){}
+  window.removeEventListener('touchstart', resumeOnFirstInteraction);
+  window.removeEventListener('mousedown', resumeOnFirstInteraction);
+}
+window.addEventListener('touchstart', resumeOnFirstInteraction);
+window.addEventListener('mousedown', resumeOnFirstInteraction);
+
+/* Helpful: start on load for convenience (comment out if undesired) */
+startGame();
+</script>
+</body>
+</html>
